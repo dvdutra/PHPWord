@@ -136,7 +136,11 @@ class Html
             'ul'        => array('List',        null,   null,       $styles,    $data,  3,              null),
             'ol'        => array('List',        null,   null,       $styles,    $data,  7,              null),
             'li'        => array('ListItem',    $node,  $element,   $styles,    $data,  null,           null),
+<<<<<<< cfd048fc6901cebeb73ff0b8809f6836dd881364
             'br'        => array('LineBreak',   null,   $element,   $styles,    null,   null,           null),
+=======
+            'img'       => array('Image',       $node,  $element,   $styles,    $data,  null,           null),
+>>>>>>> addHtml() Img tag
         );
 
         $newElement = null;
@@ -403,6 +407,63 @@ class Html
             }
             $element->addListItem($text, $data['listdepth'], $styles['font'], $styles['list'], $styles['paragraph']);
         }
+    }
+
+    /**
+     * Parse image node
+     *
+     * @param \DOMNode $node
+     * @param \PhpOffice\PhpWord\Element\AbstractContainer $element
+     * @param array &$styles
+     * @return \PhpOffice\PhpWord\Element\TextRun
+     *
+    **/
+    private static function parseImage($node, $element, &$styles, $data)
+    {
+        $style=array();
+        foreach ($node->attributes as $attribute) {
+            switch ($attribute->name) {
+                case 'src':
+                    $src=$attribute->value;
+                    break;
+                case 'width':
+                    $width=$attribute->value;
+                    $style['width']=$width;
+                    break;
+                case 'height':
+                    $height=$attribute->value;
+                    $style['height']=$height;
+                    break;
+                case 'style':
+                    $styleattr=explode(';', $attribute->value);
+                    foreach ($styleattr as $attr) {
+                        if (strpos($attr, ':')) {
+                            list($k, $v) = explode(':', $attr);
+                            switch ($k) {
+                                case 'float':
+                                    if (trim($v)=='right') {
+                                        $style['hPos']=\PhpOffice\PhpWord\Style\Image::POS_RIGHT;
+                                        $style['hPosRelTo']=\PhpOffice\PhpWord\Style\Image::POS_RELTO_PAGE;
+                                        $style['pos']=\PhpOffice\PhpWord\Style\Image::POS_RELATIVE;
+                                        $style['wrap']=\PhpOffice\PhpWord\Style\Image::WRAP_TIGHT;
+                                        $style['overlap']=true;
+                                    }
+                                    if (trim($v)=='left') {
+                                        $style['hPos']=\PhpOffice\PhpWord\Style\Image::POS_LEFT;
+                                        $style['hPosRelTo']=\PhpOffice\PhpWord\Style\Image::POS_RELTO_PAGE;
+                                        $style['pos']=\PhpOffice\PhpWord\Style\Image::POS_RELATIVE;
+                                        $style['wrap']=\PhpOffice\PhpWord\Style\Image::WRAP_TIGHT;
+                                        $style['overlap']=true;
+                                    }
+                                    break;
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+        $newElement = $element->addImage($src, $style);
+        return $newElement;
     }
 
     /**
