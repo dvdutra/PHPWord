@@ -18,6 +18,10 @@
 namespace PhpOffice\PhpWord\Shared;
 
 use PhpOffice\PhpWord\Element\AbstractContainer;
+use PhpOffice\PhpWord\Element\Cell;
+use PhpOffice\PhpWord\Element\Row;
+use PhpOffice\PhpWord\Element\Table;
+use PhpOffice\PhpWord\SimpleType\Jc;
 
 /**
  * Common Html functions
@@ -100,7 +104,7 @@ class Html
     protected static function parseNode($node, $element, $styles = array(), $data = array())
     {
         // Populate styles array
-        $styleTypes = array('font', 'paragraph', 'list');
+        $styleTypes = array('font', 'paragraph', 'list', 'table', 'row', 'cell');
         foreach ($styleTypes as $styleType) {
             if (!isset($styles[$styleType])) {
                 $styles[$styleType] = array();
@@ -119,12 +123,16 @@ class Html
             'h6'        => array('Heading',     null,   $element,   $styles,    null,   'Heading6',     null),
             '#text'     => array('Text',        $node,  $element,   $styles,    null,   null,           null),
             'strong'    => array('Property',    null,   null,       $styles,    null,   'bold',         true),
+            'b'         => array('Property',    null,   null,       $styles,    null,   'bold',         true),
             'em'        => array('Property',    null,   null,       $styles,    null,   'italic',       true),
+            'i'         => array('Property',    null,   null,       $styles,    null,   'italic',       true),
+            'u'         => array('Property',    null,   null,       $styles,    null,   'underline',    'single'),
             'sup'       => array('Property',    null,   null,       $styles,    null,   'superScript',  true),
             'sub'       => array('Property',    null,   null,       $styles,    null,   'subScript',    true),
-            'table'     => array('Table',       $node,  $element,   $styles,    null,   'addTable',     true),
-            'tr'        => array('Table',       $node,  $element,   $styles,    null,   'addRow',       true),
-            'td'        => array('Table',       $node,  $element,   $styles,    null,   'addCell',      true),
+            'table'     => array('Table',       $node,  $element,   $styles,    null,   null,           null),
+            'tr'        => array('Row',         $node,  $element,   $styles,    null,   null,           null),
+            'td'        => array('Cell',        $node,  $element,   $styles,    null,   null,           null),
+            'th'        => array('Cell',        $node,  $element,   $styles,    null,   null,           null),
             'ul'        => array('List',        null,   null,       $styles,    $data,  3,              null),
             'ol'        => array('List',        null,   null,       $styles,    $data,  7,              null),
             'li'        => array('ListItem',    $node,  $element,   $styles,    $data,  null,           null),
@@ -179,7 +187,7 @@ class Html
             $cNodes = $node->childNodes;
             if (!empty($cNodes)) {
                 foreach ($cNodes as $cNode) {
-                    if ($element instanceof AbstractContainer) {
+                    if ($element instanceof AbstractContainer || $element instanceof Table || $element instanceof Row) {
                         self::parseNode($cNode, $element, $styles, $data);
                     }
                 }
@@ -259,6 +267,17 @@ class Html
     }
 
     /**
+     * Parse span node
+     *
+     * @param \DOMNode $node
+     * @param array &$styles
+     */
+    private static function parseSpan($node, &$styles)
+    {
+        self::parseInlineStyle($node, $styles['font']);
+    }
+
+    /**
      * Parse table node
      *
      * @param \DOMNode $node
@@ -269,11 +288,11 @@ class Html
      *
      * @todo As soon as TableItem, RowItem and CellItem support relative width and height
      */
-    private static function parseTable($node, $element, &$styles, $argument1)
+    private static function parseTable($node, $element, &$styles)
     {
-        $styles['paragraph'] = self::parseInlineStyle($node, $styles['paragraph']);
+        $elementStyles = self::parseInlineStyle($node, $styles['table']);
 
-        $newElement = $element->$argument1();
+        $newElement = $element->addTable($elementStyles);
 
         // $attributes = $node->attributes;
         // if ($attributes->getNamedItem('width') !== null) {
@@ -288,6 +307,62 @@ class Html
         // }
 
         return $newElement;
+    }
+
+    /**
+     * Parse a table row
+     *
+     * @param \DOMNode $node
+     * @param \PhpOffice\PhpWord\Element\Table $element
+     * @param array &$styles
+     * @return Row $element
+     */
+    private static function parseRow($node, $element, &$styles)
+    {
+        $rowStyles = self::parseInlineStyle($node, $styles['row']);
+        if ($node->parentNode->nodeName == 'thead') {
+            $rowStyles['tblHeader'] = true;
+        }
+
+        return $element->addRow(null, $rowStyles);
+    }
+
+    /**
+     * Parse table cell
+     *
+     * @param \DOMNode $node
+     * @param \PhpOffice\PhpWord\Element\Table $element
+     * @param array &$styles
+     * @return Cell $element
+     */
+    private static function parseCell($node, $element, &$styles)
+    {
+        $cellStyles = self::recursiveParseStylesInHierarchy($node, $styles['cell']);
+
+        $colspan = $node->getAttribute('colspan');
+        if (!empty($colspan)) {
+            $cellStyles['gridSpan'] = $colspan - 0;
+        }
+
+        return $element->addCell(null, $cellStyles);
+    }
+
+    /**
+     * Recursively parses styles on parent nodes
+     * TODO if too slow, add caching of parent nodes, !! everything is static here so watch out for concurrency !!
+     *
+     * @param \DOMNode $node
+     * @param array &$styles
+     */
+    private static function recursiveParseStylesInHierarchy(\DOMNode $node, array $style)
+    {
+        $parentStyle = self::parseInlineStyle($node, array());
+        $style = array_merge($parentStyle, $style);
+        if ($node->parentNode != null && XML_ELEMENT_NODE == $node->parentNode->nodeType) {
+            $style = self::recursiveParseStylesInHierarchy($node->parentNode, $style);
+        }
+
+        return $style;
     }
 
     /**
