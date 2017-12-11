@@ -28,7 +28,7 @@ use PhpOffice\PhpWord\SimpleType\Jc;
  *
  * @SuppressWarnings(PHPMD.UnusedPrivateMethod) For readWPNode
  */
-class Html
+class Html 
 {
     /**
      * Add HTML parts.
